@@ -23,7 +23,7 @@ export default function RootLayout({
             <a href="#introduction">Quickstart</a>
             <a href="#quick-command-reference">Commands</a>
             <a
-              href="https://github.com/keploy"
+              href="https://github.com/palakwadhwanii/keploy-go-quickstart"
               target="_blank"
               rel="noreferrer"
             >
