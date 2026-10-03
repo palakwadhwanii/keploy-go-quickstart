@@ -1,0 +1,253 @@
+<h1 id="introduction">From API Call to Automated Test with Keploy</h1>
+
+## My first Keploy Go quickstart
+
+I started with a small Go URL-shortener application built with Echo and PostgreSQL.
+
+The goal was simple:
+
+> Make an API request once, let Keploy capture what happened, and replay that interaction as an automated test.
+
+What surprised me was that Keploy did more than record the HTTP request. It also captured the application's dependency interactions so the test could be replayed later.
+
+---
+
+<h2 id="what-i-built">What I built</h2>
+
+The quickstart uses:
+
+- **Go**: application
+- **Echo**: HTTP framework
+- **PostgreSQL**: database
+- **Docker Compose**: application environment
+- **Keploy**: API test recording and replay
+
+The workflow looks like this:
+
+```text
+Go + Echo Application
+        |
+        v
+   HTTP Request
+        |
+        v
+      Keploy
+        |
+        v
+Test Cases + Mocks
+        |
+        v
+      Replay
+        |
+        v
+    Test Result
+```
+
+---
+
+<h2 id="step-1">Step 1: Get the Go application running</h2>
+
+I cloned the sample repository and moved into the Echo + PostgreSQL example:
+
+```bash
+git clone https://github.com/keploy/samples-go.git
+cd samples-go/echo-sql
+```
+
+Then I downloaded the Go dependencies:
+
+```bash
+go mod download
+```
+
+The project already used the Docker service name `postgresDb` for the PostgreSQL connection, so I did not need to change the database host.
+
+### Why this matters
+
+When an application runs inside Docker Compose, `localhost` refers to the current container.
+
+PostgreSQL is another service, so the application communicates with it using its Compose service name.
+
+---
+
+<h2 id="step-2">Step 2: Start recording with Keploy</h2>
+
+Once Docker Desktop was running, I started recording:
+
+```bash
+keploy record -c "docker compose up" --container-name "echoApp" --build-delay 50
+```
+
+Instead of manually writing a test first, I could interact with the application normally while Keploy recorded the interaction.
+
+---
+
+<h2 id="step-3">Step 3: Make a real API request</h2>
+
+With recording active, I opened a second terminal and sent a POST request:
+
+```bash
+curl --request POST \
+  --url http://localhost:8082/url \
+  --header 'content-type: application/json' \
+  --data '{
+    "url": "https://github.com"
+  }'
+```
+
+The application returned a shortened URL similar to:
+
+```text
+http://localhost:8082/4KepjkTT
+```
+
+> **Aha moment:** I wasn't writing the test case first. I was using the application normally and Keploy was capturing the interaction.
+
+---
+
+<h2 id="step-4">Step 4: Stop recording</h2>
+
+After making the request, I stopped recording with:
+
+```text
+Ctrl + C
+```
+
+This helped me understand:
+
+> **Recording captures the interaction. Testing replays it.**
+
+---
+
+<h2 id="step-5">Step 5: Replay the recorded tests</h2>
+
+After recording the API interaction, I ran:
+
+```bash
+keploy test -c "docker compose up" --container-name "echoApp" --build-delay 50 --delay 10
+```
+
+The replay took longer than I initially expected because Keploy had to prepare the replay environment and execute the recorded test sets.
+
+The final Keploy output reported:
+
+```text
+All 4 test(s) passed across 2 test-set(s). Suite is green and dependency-free.
+```
+
+The overall workflow became:
+
+```text
+Interact
+   |
+   v
+Record
+   |
+   v
+Test Cases + Mocks
+   |
+   v
+Replay
+   |
+   v
+4 Tests Passed
+```
+
+---
+
+<h2 id="what-confused-me">What confused me</h2>
+
+### Why did Docker need to be running?
+
+My first recording attempt failed because the Docker daemon wasn't running.
+
+Starting Docker Desktop and verifying it with:
+
+```bash
+docker info
+```
+
+solved the issue.
+
+The Keploy recording command was launching the application through Docker Compose, so Docker had to be available first.
+
+### Why did replay take longer?
+
+Replay involves more than simply sending the HTTP request again.
+
+Keploy prepares the replay environment, starts the application and agent, loads the recorded data, and executes the test sets.
+
+### What are mocks doing?
+
+This was the biggest conceptual shift for me.
+
+Keploy can record dependency interactions and use them during replay. This reduces the need to reproduce the same live dependency interaction every time a test is executed.
+
+### One replay caveat
+
+During replay, I noticed PostgreSQL mock-related messages and an application database EOF message in the logs.
+
+However, the final Keploy summary marked the suite as `verified_green` and reported all four tests as passing.
+
+This reminded me to read the complete test output instead of judging the result from a single log line.
+
+---
+
+<h2 id="what-i-learned">What I learned</h2>
+
+The easiest way for me to understand Keploy is:
+
+> **Use the application normally once, capture the interaction, then make that interaction repeatable.**
+
+Before this quickstart, I mainly thought about API testing as something where I would manually write test cases first.
+
+Recording a real interaction first made the record-and-replay workflow much easier to understand.
+
+---
+<h2 id="quick-command-reference">Quick Command Reference</h2>
+
+### Clone the sample
+
+```bash
+git clone https://github.com/keploy/samples-go.git
+cd samples-go/echo-sql
+```
+
+### Download dependencies
+
+```bash
+go mod download
+```
+
+### Start recording
+
+```bash
+keploy record -c "docker compose up" --container-name "echoApp" --build-delay 50
+```
+
+### Make the API request
+
+```bash
+curl --request POST \
+  --url http://localhost:8082/url \
+  --header 'content-type: application/json' \
+  --data '{
+    "url": "https://github.com"
+  }'
+```
+
+### Replay tests
+
+```bash
+keploy test -c "docker compose up" --container-name "echoApp" --build-delay 50 --delay 10
+```
+
+---
+
+## Final takeaway
+
+**Interact → Record → Replay**
+
+Instead of starting by manually writing an API test, I started with a real interaction and saw how Keploy could turn that interaction into something repeatable.
+
+That was the main idea I took away from my first Keploy Go quickstart.
